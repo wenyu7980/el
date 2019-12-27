@@ -1,0 +1,420 @@
+/**
+ * JavaCC template file created by SF JavaCC plugin 1.5.28+ wizard for JavaCC 1.5.0+
+ */
+options
+{
+  STATIC = false;
+  UNICODE_INPUT = true;
+//  DEBUG_PARSER = true;
+}
+
+PARSER_BEGIN(ExpressionLanguageParser)
+package com.wenyu7980.el;
+
+import java.math.BigDecimal;
+import java.util.Objects;
+import java.lang.reflect.Field;
+import java.util.List;
+import java.util.ArrayList;
+import java.lang.reflect.Method;
+import java.lang.Class;
+
+public class ExpressionLanguageParser
+{
+    private boolean toBoolean(Object object) {
+        return (Boolean) object;
+    }
+}
+
+PARSER_END(ExpressionLanguageParser)
+
+/** 跳过非打印字符 */
+SKIP :
+{
+  " "
+| "\r"
+| "\t"
+| "\n"
+}
+
+TOKEN :
+{
+  < #LETTER : [ "$", "#", "a"-"z", "A"-"Z", "_" ] >
+| < #DIGIT : [ "0"-"9" ] >
+| /* 数字（整数，小数） */
+  < NUMBER :
+    (< DIGIT >)+
+  | (< DIGIT >)+ "." (< DIGIT >)+ >
+| /* 标识符 */
+  < IDENTIFIER :  < LETTER > ( < LETTER > | < DIGIT > )* >
+}
+
+/* 字符串 */
+MORE :
+{
+  < "\"" > : IN_STRING
+}
+< IN_STRING >
+MORE :
+{
+  < (~[ "\"", "\\", "\r", "\n" ])+ >
+| < "\\" ([ "0"-"7" ]) {3} >
+| < "\\" ~[ ] >
+}
+
+< IN_STRING >
+TOKEN :
+{
+  < STRING : "\"" > : DEFAULT
+}
+
+
+/** 语句 */
+Object statement(ElContext context) :
+{
+  Object obj;
+}
+{
+  obj = express(context) ";"
+  {
+    return obj;
+  }
+}
+/** 表单式 */
+Object express(ElContext context) :
+{
+  Object obj;
+}
+{
+  (
+    obj = ternary(context)
+  )
+  {
+    return obj;
+  }
+}
+
+
+
+/** 三元表达式 */
+Object ternary(ElContext context) :
+{
+  Object left;
+  Object mid = null;
+  Object right = null;
+}
+{
+  (
+    left = notExpr(context)
+    [
+      "?" mid = express(context) ":" right = express(context)
+      {
+        return toBoolean(left) ? mid : right;
+      }
+    ]
+  )
+  {
+    return left;
+  }
+}
+/** 逻辑 start 优先级由低到高 */
+/** 非 */
+Object notExpr(ElContext context) :
+{
+  Object obj;
+  Token t = null;
+}
+{
+  ([t = "!"] obj =  orExpr(context))
+  {
+    return  Objects.isNull(t) ?obj:!toBoolean((obj));
+  }
+}
+/** 或 */
+Object orExpr(ElContext context) :
+{
+  Object left;
+  Object right;
+}
+{
+  left = andExpr(context)
+  (
+    "||" right = andExpr(context)
+    {
+      left = toBoolean(left) || toBoolean(right);
+      if (toBoolean(left)){
+        return true;
+      }
+    }
+  ) *
+  {
+    return left;
+  }
+}
+/** 与 */
+Object andExpr(ElContext context) :
+{
+  Object left;
+  Object right;
+}
+{
+  left = compare(context)
+  (
+    "&&" right = compare(context)
+    {
+      left = toBoolean(left) && toBoolean(right);
+      if (!toBoolean(left)){
+        return false;
+      }
+    }
+  ) *
+  {
+    return left;
+  }
+}
+
+/** 比较 */
+Object compare(ElContext context) :
+{
+    Object left = null;
+    Object right = null;
+}
+{
+  left = binary(context)
+  [
+    "<>" right = binary(context)
+    {
+      if (left instanceof Comparable){
+          return ((Comparable) left).compareTo(right) != 0;
+      }
+      return !Objects.equals(left,right);
+    }
+  |
+    ">" right = binary(context)
+    {
+      return ((Comparable) left).compareTo(right) > 0;
+    }
+  | "<" right = binary(context)
+    {
+      return ((Comparable) left).compareTo(right) < 0;
+    }
+  | "==" right = binary(context)
+    {
+      if (left instanceof BigDecimal){
+        return ((Comparable) left).compareTo(right) == 0;
+      }
+       return Objects.equals(left,right);
+    }
+  | ">=" right = binary(context)
+    {
+      return ((Comparable) left).compareTo(right) >= 0;
+    }
+  | "<=" right = binary(context)
+    {
+      return ((Comparable) left).compareTo(right) <= 0;
+    }
+  ]
+  {
+    return left;
+  }
+}
+/** 逻辑 end */
+
+/** 二元表达式 */
+Object binary(ElContext context) :
+{
+  Object obj = null;
+}
+{
+  obj = plusMinus(context)
+  {
+    return obj;
+  }
+}
+/** 加减 */
+Object plusMinus(ElContext context) :
+{
+  Object left = null;
+  Object right = null;
+}
+{
+  left = multiDiv(context)
+  (
+    "+" right = multiDiv(context)
+    {
+      left = ((BigDecimal) left).add((BigDecimal) right);
+    }
+  | "-" right = multiDiv(context)
+    {
+      left = ((BigDecimal) left).subtract((BigDecimal) right);
+    }
+  )*
+  {
+    return left;
+  }
+}
+
+/** 乘除 */
+Object multiDiv(ElContext context) :
+{
+  Object left = null;
+  Object right = null;
+}
+{
+  left = unary(context)
+  (
+    "*" right = unary(context)
+    {
+      left = ((BigDecimal) left).multiply((BigDecimal) right);
+    }
+  | "/" right = unary(context)
+    {
+      left = ((BigDecimal) left).divide((BigDecimal) right);
+    }
+  )*
+  {
+    return left;
+  }
+}
+/** 单元运算符 */
+Object unary(ElContext context) :
+{
+  Object obj = null;
+}
+{
+  (
+    // 负数
+    "-" obj = primary(context)
+    {
+      obj = ((BigDecimal) obj).multiply(new BigDecimal(- 1));
+    }
+  | // 括号
+    "(" obj = express(context) ")"
+  | // 基础值
+    obj = primary(context)
+  )
+  {
+    return obj;
+  }
+}
+/** 基础值 */
+Object primary(ElContext context) :
+{
+  Token t = null;
+  Object obj = null;
+}
+{
+  (
+    // 变量
+    obj = variable(context)
+  |
+    // 字符串字面值常量
+    t = < STRING >
+    {
+      String str = t.toString();
+      obj = str.substring(1, str.length() - 1);
+    }
+  | // 数字字面值常量
+    t = < NUMBER >
+    {
+      obj = new BigDecimal(t.toString());
+    }
+  )
+  {
+    return obj;
+  }
+}
+
+
+/** 属性变量 */
+Object variable(ElContext context) :
+{
+  Token t;
+  Field field = null;
+  Object obj = null;
+  Object[] parameters=null;
+}
+{
+  (
+    t = < IDENTIFIER >
+    {
+      if("null".equals(t.toString()))
+      {
+        obj = null;
+      }
+      else
+      {
+        obj = context.get(t.toString());
+      }
+    }
+    (
+      LOOKAHEAD(3)
+      "." t = < IDENTIFIER > "(" parameters = parameters(context) ")"
+      {
+        try
+        {
+          Class<?>[] parameterTypes = new Cla ss[parameters.length];
+          for (int i = 0 ;i < parameters.length;i++){
+            parameterTypes[i] = parameters[i].getClass();
+          }
+          Method method = obj.getClass().getDeclaredMethod(t.toString(),parameterTypes);
+          method.setAccessible(true);
+          obj = method.invoke(obj,parameters);
+        }
+        catch (Exception e)
+        {
+          throw new RuntimeException(e);
+        }
+      }
+      |
+      "." t = < IDENTIFIER >
+      {
+        try
+        {
+          field = obj.getClass().getDeclaredField(t.toString());
+          field.setAccessible(true);
+          if (field.getType().isEnum())
+          {
+            obj = field.get(obj).toString();
+          }
+          else
+          {
+            obj = field.get(obj);
+          }
+        }
+        catch (Exception e)
+        {
+          throw new RuntimeException(e);
+        }
+      }
+    )*
+  )
+  {
+    return obj;
+  }
+}
+/** 方法参数 */
+Object[] parameters(ElContext context) :
+{
+  List<Object> list = new ArrayList<Object>();
+  Object obj;
+}
+{
+  (
+    [
+      obj = express(context)
+        {
+          list.add(obj);
+        }
+    ]
+    (
+      "," obj = express(context)
+      {
+        list.add(obj);
+      }
+    )*
+  )
+  {
+    return list.toArray();
+  }
+}
