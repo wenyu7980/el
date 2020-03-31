@@ -28,7 +28,7 @@ public class ExpressionLanguageParser
 
 PARSER_END(ExpressionLanguageParser)
 
-/** 跳过非打印字符 */
+/** skip */
 SKIP :
 {
   " "
@@ -41,15 +41,15 @@ TOKEN :
 {
   < #LETTER : [ "$", "#", "a"-"z", "A"-"Z", "_" ] >
 | < #DIGIT : [ "0"-"9" ] >
-| /* 数字（整数，小数） */
+| /* Number */
   < NUMBER :
     (< DIGIT >)+
   | (< DIGIT >)+ "." (< DIGIT >)+ >
-| /* 标识符 */
+| /* digit */
   < IDENTIFIER :  < LETTER > ( < LETTER > | < DIGIT > )* >
 }
 
-/* 字符串 */
+/* String */
 MORE :
 {
   < "\"" > : IN_STRING
@@ -69,7 +69,7 @@ TOKEN :
 }
 
 
-/** 语句 */
+/** statement */
 Object statement(ElContext context) :
 {
   Object obj;
@@ -80,7 +80,7 @@ Object statement(ElContext context) :
     return obj;
   }
 }
-/** 表单式 */
+/** express */
 Object express(ElContext context) :
 {
   Object obj;
@@ -96,7 +96,7 @@ Object express(ElContext context) :
 
 
 
-/** 三元表达式 */
+/** ternary */
 Object ternary(ElContext context) :
 {
   Object left;
@@ -117,8 +117,8 @@ Object ternary(ElContext context) :
     return left;
   }
 }
-/** 逻辑 start 优先级由低到高 */
-/** 非 */
+/** logic start */
+/** notExpr */
 Object notExpr(ElContext context) :
 {
   Object obj;
@@ -130,7 +130,7 @@ Object notExpr(ElContext context) :
     return  Objects.isNull(t) ?obj:!toBoolean((obj));
   }
 }
-/** 或 */
+/** or */
 Object orExpr(ElContext context) :
 {
   Object left;
@@ -151,7 +151,7 @@ Object orExpr(ElContext context) :
     return left;
   }
 }
-/** 与 */
+/** and */
 Object andExpr(ElContext context) :
 {
   Object left;
@@ -173,7 +173,7 @@ Object andExpr(ElContext context) :
   }
 }
 
-/** 比较 */
+/** compare */
 Object compare(ElContext context) :
 {
     Object left = null;
@@ -218,9 +218,9 @@ Object compare(ElContext context) :
     return left;
   }
 }
-/** 逻辑 end */
+/** logic end */
 
-/** 二元表达式 */
+/** binary */
 Object binary(ElContext context) :
 {
   Object obj = null;
@@ -231,7 +231,7 @@ Object binary(ElContext context) :
     return obj;
   }
 }
-/** 加减 */
+/** plusMinus */
 Object plusMinus(ElContext context) :
 {
   Object left = null;
@@ -254,7 +254,7 @@ Object plusMinus(ElContext context) :
   }
 }
 
-/** 乘除 */
+/** multiDiv */
 Object multiDiv(ElContext context) :
 {
   Object left = null;
@@ -276,28 +276,28 @@ Object multiDiv(ElContext context) :
     return left;
   }
 }
-/** 单元运算符 */
+/** unary */
 Object unary(ElContext context) :
 {
   Object obj = null;
 }
 {
   (
-    // 负数
+    // -
     "-" obj = primary(context)
     {
       obj = ((BigDecimal) obj).multiply(new BigDecimal(- 1));
     }
-  | // 括号
+  | // ()
     "(" obj = express(context) ")"
-  | // 基础值
+  | // basic value
     obj = primary(context)
   )
   {
     return obj;
   }
 }
-/** 基础值 */
+/** primary */
 Object primary(ElContext context) :
 {
   Token t = null;
@@ -305,16 +305,16 @@ Object primary(ElContext context) :
 }
 {
   (
-    // 变量
+    // variable
     obj = variable(context)
   |
-    // 字符串字面值常量
+    // String
     t = < STRING >
     {
       String str = t.toString();
       obj = str.substring(1, str.length() - 1);
     }
-  | // 数字字面值常量
+  | // number
     t = < NUMBER >
     {
       obj = new BigDecimal(t.toString());
@@ -326,7 +326,7 @@ Object primary(ElContext context) :
 }
 
 
-/** 属性变量 */
+/** variable */
 Object variable(ElContext context) :
 {
   Token t;
@@ -353,7 +353,7 @@ Object variable(ElContext context) :
       {
         try
         {
-          Class<?>[] parameterTypes = new Cla ss[parameters.length];
+          Class<?>[] parameterTypes = new Class[parameters.length];
           for (int i = 0 ;i < parameters.length;i++){
             parameterTypes[i] = parameters[i].getClass();
           }
@@ -393,7 +393,7 @@ Object variable(ElContext context) :
     return obj;
   }
 }
-/** 方法参数 */
+/** parameters */
 Object[] parameters(ElContext context) :
 {
   List<Object> list = new ArrayList<Object>();
